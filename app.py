@@ -2,7 +2,6 @@ import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from gtts import gTTS
-import speech_recognition as sr
 import tempfile
 import random
 
@@ -15,8 +14,21 @@ class LearningAssistant:
             torch_dtype=torch.float16,
             device_map="auto"
         )
+
+        # Add storytelling topics
+        self.cs_story_topics = [
+            "Recursion", "Binary Search", "Sorting Algorithms",
+            "Data Structures", "Object-Oriented Programming",
+            "Memory Management", "Network Protocols", "Database Concepts",
+            "Threading", "API Design", "Version Control", "Cloud Computing",
+            "Cybersecurity", "Machine Learning Basics", "Web Development"
+        ]
         
-        self.recognizer = sr.Recognizer()
+        # Add storytelling styles
+        self.story_styles = [
+            "Adventure", "Mystery", "Sci-Fi", "Fantasy",
+            "Fable", "Journey", "Discovery"
+        ]
 
         # Define code analysis tasks
         self.code_analysis_tasks = {
@@ -139,10 +151,41 @@ class LearningAssistant:
             {code}"""
         )
         return self.generate_response(prompt)
+    
+    def generate_story(self, topic, style="Adventure"):
+        """Generate a story-based explanation of a CS concept"""
+        prompt = self.create_prompt(f"""Create an engaging {style} story to explain the computer science concept of {topic}. 
+        The story should:
+        - Make the concept easy to understand for students
+        - Use creative analogies and metaphors
+        - Include characters and a plot that relate to the concept
+        - Highlight key learning points naturally within the story
+        - End with a brief summary of the main concept learned
+        
+        Make it engaging and memorable while ensuring technical accuracy.
+        
+        Title: A {style} Tale of {topic}
+        """)
+        return self.generate_response(prompt)
+
+    def generate_story_with_audio(self, topic, style="Adventure"):
+        """Generate both story text and audio"""
+        # Generate the story
+        story = self.generate_story(topic, style)
+        
+        # Generate audio for the story
+        audio_file = self.text_to_speech(story)
+        
+        return story, audio_file        
 
 def create_gradio_interface():
     assistant = LearningAssistant()
     
+    # Combined DreamScribe and TTS Interface
+    def dreamscribe_with_audio_interface(topic, style):
+        story, audio = assistant.generate_story_with_audio(topic, style)
+        return story, audio
+
     # Blog Generation Interface
     def blog_interface(topic=None):
         topic, blog = assistant.generate_blog(topic)
@@ -200,6 +243,82 @@ def create_gradio_interface():
             tts_button = gr.Button("Convert to Speech")
             audio_output = gr.Audio(label="Generated Speech")
             tts_button.click(tts_interface, inputs=text_input, outputs=audio_output)
+
+        with gr.Tab("DreamScribe - Interactive Stories"):
+            gr.Markdown("""
+            # DreamScribe: Interactive CS Story Learning
+            Learn computer science concepts through engaging stories with both text and audio!
+            """)
+            
+            with gr.Row():
+                with gr.Column(scale=1):
+                    story_topic = gr.Dropdown(
+                        choices=assistant.cs_story_topics,
+                        label="Select CS Topic",
+                        allow_custom_value=True
+                    )
+                    story_style = gr.Dropdown(
+                        choices=assistant.story_styles,
+                        label="Story Style",
+                        value="Adventure"
+                    )
+                    story_button = gr.Button("Generate Story", variant="primary")
+
+            with gr.Row():
+                with gr.Column(scale=2):
+                    story_output = gr.Markdown(
+                        label="Your Story",
+                        show_label=True,
+                        elem_classes="story-output"
+                    )
+                with gr.Column(scale=1):
+                    audio_output = gr.Audio(
+                        label="Listen to the Story",
+                        show_label=True,
+                        elem_classes="audio-player"
+                    )
+            
+            # Add some example combinations
+            gr.Examples(
+                examples=[
+                    ["Recursion", "Adventure"],
+                    ["Binary Search", "Mystery"],
+                    ["Sorting Algorithms", "Fantasy"],
+                ],
+                inputs=[story_topic, story_style],
+                outputs=[story_output, audio_output],
+                fn=dreamscribe_with_audio_interface,
+                label="Example Topics"
+            )
+            
+            story_button.click(
+                dreamscribe_with_audio_interface,
+                inputs=[story_topic, story_style],
+                outputs=[story_output, audio_output]
+            )
+
+        # Enhanced CSS for better layout
+        gr.Markdown("""
+        <style>
+        .story-output {
+            font-size: 16px;
+            line-height: 1.6;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .audio-player {
+            margin-top: 20px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        </style>
+        """)
 
     return interface
 
