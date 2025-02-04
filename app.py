@@ -1,3 +1,7 @@
+# Install required packages
+!pip install gradio transformers torch gtts 
+
+
 import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
